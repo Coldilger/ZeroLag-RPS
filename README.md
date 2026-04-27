@@ -50,7 +50,7 @@ ZeroLag-RPS/
 
 ### 1. Clone the repository
 ```bash
-git clone [https://github.com/Coldilger/ZeroLag-RPS.git](https://github.com/Coldilger/ZeroLag-RPS.git)
+git clone https://github.com/Coldilger/ZeroLag-RPS.git
 cd ZeroLag-RPS
 ```
 ### 2. Install dependencies
