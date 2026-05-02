@@ -53,14 +53,38 @@ ZeroLag-RPS/
 git clone https://github.com/Coldilger/ZeroLag-RPS.git
 cd ZeroLag-RPS
 ```
+
 ### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
-### 3. Run the Live Agent
+
+### 3. Run the Game
+
+**Option A (Recommended):**
+```bash
+python run_game.py
+```
+This launcher automatically checks dependencies and downloads the MediaPipe hand detection model if needed.
+
+**Option B (Direct):**
 ```bash
 python scripts/live_inference.py
 ```
+
+### ⚙️ First Run Setup
+On first launch, the game will automatically:
+1. ✓ Download `hand_landmarker.task` model (~9.2 MB) from Google's MediaPipe storage
+2. ✓ Load the trained RPS classifier (`model/rps_tcn_model.pth`)
+3. ✓ Initialize your webcam
+
+The `hand_landmarker.task` file is stored in `model/` and is required for MediaPipe 0.10.35+.
+
+📖 **Want to know more?** See [HAND_LANDMARKER.md](docs/HAND_LANDMARKER.md) for technical details about the hand detection model.
+
+### 🎮 In-Game Controls
+- **SPACE** - Start a new round
+- **Q** - Quit the game
 
 ## 📊 Dataset
 The model was trained on a custom dataset comprising ~5,300 frames of Rock, Paper, and Scissors gestures recorded at 20fps.
