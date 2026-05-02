@@ -10,10 +10,13 @@ import threading
 import mediapipe as mp
 from mediapipe.tasks.python.vision import hand_landmarker as mp_hand
 from mediapipe.tasks.python.vision.core import image as mp_image
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python.core import base_options
 from collections import deque
 from torchvision import transforms
 from PIL import Image
 from pathlib import Path
+import urllib.request
 
 # ========================================
 # Version of the file: live_battle_10f.py
@@ -203,25 +206,47 @@ def run_game():
 
     # Prepare path for the MediaPipe hand landmarker task model
     model_path = repo_root / "model" / "hand_landmarker.task"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Try multiple URLs for downloading the model
+    download_urls = [
+        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker.task",
+        "https://storage.googleapis.com/mediapipe-assets/hand_landmarker.task",
+    ]
+    
     if not model_path.exists():
-        try:
-            print(f"Downloading hand_landmarker model to {model_path}...")
-            import urllib.request
-            model_path.parent.mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(
-                "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker.task",
-                str(model_path)
-            )
-            print("Model downloaded")
-        except Exception as e:
-            print(f"Failed to download hand_landmarker model: {e}")
+        print(f"Downloading hand_landmarker model to {model_path}...")
+        downloaded = False
+        for url in download_urls:
+            try:
+                print(f"  Trying: {url}")
+                urllib.request.urlretrieve(url, str(model_path))
+                print("  ✓ Model downloaded successfully")
+                downloaded = True
+                break
+            except Exception as e:
+                print(f"  ✗ Failed: {e}")
+                continue
+        
+        if not downloaded:
+            print("ERROR: Could not download hand_landmarker model from any source.")
+            print("Please download manually from:")
+            print("  https://developers.google.com/mediapipe/solutions/vision/hand_landmarker")
+            print(f"And place it at: {model_path}")
             return
 
-    # Create HandLandmarker from the python.tasks vision implementation
+    # Create HandLandmarker using Tasks API
     try:
-        hand_landmarker = mp_hand.HandLandmarker.create_from_model_path(str(model_path))
+        print(f"Loading hand_landmarker from {model_path}...")
+        base_opts = base_options.BaseOptions(model_asset_path=str(model_path))
+        options = vision.HandLandmarkerOptions(base_options=base_opts)
+        hand_landmarker = vision.HandLandmarker.create_from_options(options)
+        print("✓ HandLandmarker initialized successfully")
     except Exception as e:
-        print(f"Error creating HandLandmarker: {e}")
+        print(f"ERROR initializing HandLandmarker: {e}")
+        print(f"Traceback: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
         return
     
     cap = cv2.VideoCapture(0)
@@ -252,14 +277,21 @@ def run_game():
         # --- 1. PROCESSING ---
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # Convert frame to MediaPipe Image and run detection with Tasks API
-        mp_img = mp_image.Image(mp_image.ImageFormat.SRGB, rgb_frame)
-        detection_result = hand_landmarker.detect(mp_img)
-        # Wrap detection_result to mimic old `results.multi_hand_landmarks` structure
+        mp_img = mp_image.Image(image_format=mp_image.ImageFormat.SRGB, data=rgb_frame)
+        
+        try:
+            detection_result = hand_landmarker.detect(mp_img)
+        except Exception as e:
+            print(f"Detection error: {e}")
+            detection_result = None
+        
+        # Wrap detection_result to mimic old `results.multi_hand_landmarks` structure for compatibility
         class ResultsWrapper:
             def __init__(self, hand_landmarks):
-                self.multi_hand_landmarks = hand_landmarks or []
+                # detection_result.hand_landmarks is already a list of NormalizedLandmarkList objects
+                self.multi_hand_landmarks = hand_landmarks if hand_landmarks else []
 
-        results = ResultsWrapper(detection_result.hand_landmarks)
+        results = ResultsWrapper(detection_result.hand_landmarks if detection_result else None)
         
         current_features = None
         current_gesture_live = None 
