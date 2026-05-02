@@ -29,8 +29,12 @@ The script automatically:
 
 GAME CONTROLS:
 -------------
-SPACE - Start new round
-Q - Quit game
+⚠️  IMPORTANT: Click on the game window first to give it focus!
+   Then use keyboard shortcuts:
+
+SPACE - Start new round (when idle)
+Q     - Quit game
+ESC   - Quit game (alternative)
 
 MODEL FILES:
 -----------
