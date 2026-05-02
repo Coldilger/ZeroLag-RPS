@@ -83,8 +83,12 @@ The `hand_landmarker.task` file is stored in `model/` and is required for MediaP
 📖 **Want to know more?** See [HAND_LANDMARKER.md](docs/HAND_LANDMARKER.md) for technical details about the hand detection model.
 
 ### 🎮 In-Game Controls
-- **SPACE** - Start a new round
-- **Q** - Quit the game
+- **SPACE** - Start a new round (when idle)
+- **Q or ESC** - Quit the game
+
+⚠️ **Important:** The game window must be in focus (clicked) for key presses to be registered. If keys don't work:
+1. Click on the game window to give it focus
+2. Try again
 
 ## 📊 Dataset
 The model was trained on a custom dataset comprising ~5,300 frames of Rock, Paper, and Scissors gestures recorded at 20fps.
