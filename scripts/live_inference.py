@@ -188,33 +188,49 @@ def draw_result_ui(img, bot_move, outcome_text):
 
 # --- GEOMETRIC HEURISTICS ---
 def get_dist(landmarks, idx1, idx2):
-    p1 = landmarks.landmark[idx1]
-    p2 = landmarks.landmark[idx2]
+    """Calculate distance between two landmarks.
+    
+    Works with Tasks API where landmarks is a list of Landmark objects.
+    """
+    p1 = landmarks[idx1]
+    p2 = landmarks[idx2]
     return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2)
 
 def is_fist(landmarks):
-    wrist = 0
-    middle_closed = get_dist(landmarks, 12, wrist) < get_dist(landmarks, 9, wrist)
-    ring_closed   = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
-    pinky_closed  = get_dist(landmarks, 20, wrist) < get_dist(landmarks, 17, wrist)
-    return (middle_closed and ring_closed and pinky_closed)
+    """Check if hand is in fist/rock pose."""
+    try:
+        wrist = 0
+        middle_closed = get_dist(landmarks, 12, wrist) < get_dist(landmarks, 9, wrist)
+        ring_closed   = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
+        pinky_closed  = get_dist(landmarks, 20, wrist) < get_dist(landmarks, 17, wrist)
+        return (middle_closed and ring_closed and pinky_closed)
+    except Exception:
+        return False
 
 def is_paper(landmarks):
-    wrist = 0
-    index_open  = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
-    middle_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
-    ring_open   = get_dist(landmarks, 16, wrist) > get_dist(landmarks, 13, wrist)
-    pinky_open  = get_dist(landmarks, 20, wrist) > get_dist(landmarks, 17, wrist)
-    return (index_open and middle_open and ring_open and pinky_open)
+    """Check if hand is in paper/open pose."""
+    try:
+        wrist = 0
+        index_open  = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
+        middle_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
+        ring_open   = get_dist(landmarks, 16, wrist) > get_dist(landmarks, 13, wrist)
+        pinky_open  = get_dist(landmarks, 20, wrist) > get_dist(landmarks, 17, wrist)
+        return (index_open and middle_open and ring_open and pinky_open)
+    except Exception:
+        return False
 
 def get_current_gesture(landmarks):
-    if is_fist(landmarks): return 'Rock'
-    if is_paper(landmarks): return 'Paper'
-    wrist = 0
-    idx_open = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
-    mid_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
-    ring_closed = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
-    if idx_open and mid_open and ring_closed: return 'Scissors'
+    """Determine gesture type from hand landmarks."""
+    try:
+        if is_fist(landmarks): return 'Rock'
+        if is_paper(landmarks): return 'Paper'
+        wrist = 0
+        idx_open = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
+        mid_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
+        ring_closed = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
+        if idx_open and mid_open and ring_closed: return 'Scissors'
+    except Exception:
+        pass
     return None
 
 def run_game():
@@ -341,8 +357,9 @@ def run_game():
             last_landmarks = hand_landmarks
             current_gesture_live = get_current_gesture(hand_landmarks)
             
-            x_list = [lm.x * w_img for lm in hand_landmarks.landmark]
-            y_list = [lm.y * h_img for lm in hand_landmarks.landmark]
+            # hand_landmarks is already a list of Landmark objects in Tasks API
+            x_list = [lm.x * w_img for lm in hand_landmarks]
+            y_list = [lm.y * h_img for lm in hand_landmarks]
             
             cx = (min(x_list) + max(x_list)) / 2
             cy = (min(y_list) + max(y_list)) / 2
@@ -447,7 +464,13 @@ def run_game():
 
         cv2.imshow("Magic RPS", frame)
         key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'): break
+        
+        # Handle quit commands (multiple ways to exit)
+        if key == ord('q') or key == ord('Q') or key == 27:  # 27 is ESC
+            print("\n👋 Closing game...")
+            break
+        
+        # Handle game start
         if key == ord(' ') and state == "IDLE":
             state = "COUNTDOWN"
             feature_buffer.clear()
@@ -455,6 +478,7 @@ def run_game():
 
     cap.release()
     cv2.destroyAllWindows()
+    print("✓ Game closed successfully")
 
 if __name__ == "__main__":
     run_game()
