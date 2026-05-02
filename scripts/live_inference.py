@@ -8,9 +8,12 @@ import os
 import math
 import threading
 import mediapipe as mp
+from mediapipe.tasks.python.vision import hand_landmarker as mp_hand
+from mediapipe.tasks.python.vision.core import image as mp_image
 from collections import deque
 from torchvision import transforms
 from PIL import Image
+from pathlib import Path
 
 # ========================================
 # Version of the file: live_battle_10f.py
@@ -18,8 +21,9 @@ from PIL import Image
 
 
 # --- CONFIGURATION ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-TCN_MODEL_PATH = os.path.join(script_dir, "rps_tcn_model.pth") 
+script_dir = Path(__file__).resolve().parent
+repo_root = script_dir.parent
+TCN_MODEL_PATH = repo_root / "model" / "rps_tcn_model.pth"
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -172,6 +176,10 @@ def get_current_gesture(landmarks):
 
 def run_game():
     print(f"Loading AI Brain...")
+    if not TCN_MODEL_PATH.exists():
+        print(f"Error loading model: file not found at '{TCN_MODEL_PATH}'")
+        return
+
     full_model = UnifiedModel().to(DEVICE)
     try:
         checkpoint = torch.load(TCN_MODEL_PATH, map_location=DEVICE)
@@ -191,14 +199,30 @@ def run_game():
     encoder = full_model.encoder.to(DEVICE)
     decoder = full_model.decoder.to(DEVICE)
     
-    print("Initializing MediaPipe...")
-    mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
+    print("Initializing MediaPipe (Tasks API)...")
+
+    # Prepare path for the MediaPipe hand landmarker task model
+    model_path = repo_root / "model" / "hand_landmarker.task"
+    if not model_path.exists():
+        try:
+            print(f"Downloading hand_landmarker model to {model_path}...")
+            import urllib.request
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            urllib.request.urlretrieve(
+                "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker.task",
+                str(model_path)
+            )
+            print("Model downloaded")
+        except Exception as e:
+            print(f"Failed to download hand_landmarker model: {e}")
+            return
+
+    # Create HandLandmarker from the python.tasks vision implementation
+    try:
+        hand_landmarker = mp_hand.HandLandmarker.create_from_model_path(str(model_path))
+    except Exception as e:
+        print(f"Error creating HandLandmarker: {e}")
+        return
     
     cap = cv2.VideoCapture(0)
     
@@ -227,7 +251,15 @@ def run_game():
         
         # --- 1. PROCESSING ---
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = hands.process(rgb_frame)
+        # Convert frame to MediaPipe Image and run detection with Tasks API
+        mp_img = mp_image.Image(mp_image.ImageFormat.SRGB, rgb_frame)
+        detection_result = hand_landmarker.detect(mp_img)
+        # Wrap detection_result to mimic old `results.multi_hand_landmarks` structure
+        class ResultsWrapper:
+            def __init__(self, hand_landmarks):
+                self.multi_hand_landmarks = hand_landmarks or []
+
+        results = ResultsWrapper(detection_result.hand_landmarks)
         
         current_features = None
         current_gesture_live = None 
