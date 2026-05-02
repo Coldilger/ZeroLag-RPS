@@ -78,7 +78,10 @@ def main():
     
     # Run game
     print("\n🚀 Launching game...")
-    print("   Controls: SPACE to start, Q to quit")
+    print("   Controls:")
+    print("   ├─ Click on game window to give it focus")
+    print("   ├─ SPACE = Start a new round")
+    print("   └─ Q or ESC = Quit game")
     print("=" * 50 + "\n")
     
     if run_game():
