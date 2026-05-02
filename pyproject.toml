@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zerolag-rps"
+version = "0.1.0"
+description = "Zero-lag Rock-Paper-Scissors with hand gesture recognition using TCN"
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+authors = [
+    {name = "Coldilger", email = ""}
+]
+license = {text = "MIT"}
+
+dependencies = [
+    "torch==2.1.2",
+    "torchvision==0.16.2",
+    "mediapipe==0.10.35",
+    "opencv-contrib-python==4.9.0.80",
+    "opencv-python==4.9.0.80",
+    "pillow>=10.0.0",
+    "numpy>=1.24.0,<2.0",
+    "tqdm>=4.66.0",
+    "pytorch-tcn>=0.0.16",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter>=1.0.0",
+    "jupyter-lab>=4.0.0",
+    "ipython>=8.10.0",
+]
+
+[tool.setuptools]
+packages = ["scripts"]
+
+[project.urls]
+Homepage = "https://github.com/Coldilger/ZeroLag-RPS"
+Repository = "https://github.com/Coldilger/ZeroLag-RPS.git"
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pylint]
+max-line-length = 100
