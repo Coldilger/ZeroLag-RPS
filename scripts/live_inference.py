@@ -1,3 +1,43 @@
+"""
+🎮 ZeroLag Rock-Paper-Scissors with Hand Gesture Recognition
+Real-time inference game using MediaPipe hand detection and PyTorch TCN model.
+
+HOW TO RUN:
+-----------
+Option 1 (Recommended - from project root):
+    python run_game.py
+
+Option 2 (From anywhere if dependencies installed):
+    python -m scripts.live_inference
+
+Option 3 (Direct):
+    python scripts/live_inference.py
+
+REQUIREMENTS:
+-----------
+- Python 3.9+
+- MediaPipe 0.10.35 (with hand_landmarker.task model)
+- PyTorch 2.1+
+- OpenCV, NumPy, Pillow
+
+AUTO-SETUP:
+----------
+The script automatically:
+1. Detects your webcam
+2. Downloads hand_landmarker.task model (9.2 MB) if missing
+3. Loads the trained TCN model
+
+GAME CONTROLS:
+-------------
+SPACE - Start new round
+Q - Quit game
+
+MODEL FILES:
+-----------
+- model/rps_tcn_model.pth : Trained gesture classifier
+- model/hand_landmarker.task : MediaPipe hand detection model (auto-downloaded)
+"""
+
 import cv2
 import torch
 import torch.nn as nn
