@@ -23,12 +23,12 @@ const int PIN_MIDDLE = 7;
 // SERVO CALIBRATION (ANGLES)
 // ---------------------------------------------------------------------------
 // These values define the mechanical limits for "Open" and "Close" states.
-// Updated with Batuhan's calibrated angles.
-const int THUMB_CLOSE  = 100;  const int THUMB_OPEN  = 0;
-const int INDEX_CLOSE  = 110;  const int INDEX_OPEN  = 0;
-const int MIDDLE_CLOSE = 90;   const int MIDDLE_OPEN = 0;
-const int RING_CLOSE   = 110;  const int RING_OPEN   = 0;
-const int PINKY_CLOSE  = 100;  const int PINKY_OPEN  = 0;
+// Updated with Hugo's calibrated angles.
+const int THUMB_CLOSE  = 140;  const int THUMB_OPEN  = 0;
+const int INDEX_CLOSE  = 180;  const int INDEX_OPEN  = 0;
+const int MIDDLE_CLOSE = 180;   const int MIDDLE_OPEN = 0;
+const int RING_CLOSE   = 120;  const int RING_OPEN   = 0; // this is loose and the close angle needs to be higher
+const int PINKY_CLOSE  = 175;  const int PINKY_OPEN  = 0;
 
 
 // Wrist positions
