@@ -555,8 +555,9 @@ def run_game():
                         outcome_text = "YOU LOSE! :)"
                         result_confidence = conf_val
                         
-                        # --- SEND TO ARDUINO ---
-                        send_move_to_arduino(arduino_ser, predicted_user_move)
+                        # --- SEND WINNING MOVE TO ARDUINO ---
+                        # send the computer's winning move rather than the user's predicted move
+                        send_move_to_arduino(arduino_ser, computer_move)
                         
                         state = "RESULT"
                         start_time = time.time()
