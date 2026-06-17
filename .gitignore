@@ -10,3 +10,19 @@ data/final_split_dataset/
 code/Videos
 code/Videos2
 noaudio_ver5
+
+# Auto-downloaded MediaPipe model (regenerated on first run)
+model/hand_landmarker.task
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

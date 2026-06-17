@@ -1,3 +1,47 @@
+"""
+🎮 ZeroLag Rock-Paper-Scissors with Hand Gesture Recognition
+Real-time inference game using MediaPipe hand detection and PyTorch TCN model.
+
+HOW TO RUN:
+-----------
+Option 1 (Recommended - from project root):
+    python run_game.py
+
+Option 2 (From anywhere if dependencies installed):
+    python -m scripts.live_inference
+
+Option 3 (Direct):
+    python scripts/live_inference.py
+
+REQUIREMENTS:
+-----------
+- Python 3.9+
+- MediaPipe 0.10.35 (with hand_landmarker.task model)
+- PyTorch 2.1+
+- OpenCV, NumPy, Pillow
+
+AUTO-SETUP:
+----------
+The script automatically:
+1. Detects your webcam
+2. Downloads hand_landmarker.task model (9.2 MB) if missing
+3. Loads the trained TCN model
+
+GAME CONTROLS:
+-------------
+⚠️  IMPORTANT: Click on the game window first to give it focus!
+   Then use keyboard shortcuts:
+
+SPACE - Start new round (when idle)
+Q     - Quit game
+ESC   - Quit game (alternative)
+
+MODEL FILES:
+-----------
+- model/rps_tcn_model.pth : Trained gesture classifier
+- model/hand_landmarker.task : MediaPipe hand detection model (auto-downloaded)
+"""
+
 import cv2
 import torch
 import torch.nn as nn
@@ -8,9 +52,15 @@ import os
 import math
 import threading
 import mediapipe as mp
+from mediapipe.tasks.python.vision import hand_landmarker as mp_hand
+from mediapipe.tasks.python.vision.core import image as mp_image
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python.core import base_options
 from collections import deque
 from torchvision import transforms
 from PIL import Image
+from pathlib import Path
+import urllib.request
 
 # ========================================
 # Version of the file: live_battle_10f.py
@@ -18,8 +68,9 @@ from PIL import Image
 
 
 # --- CONFIGURATION ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-TCN_MODEL_PATH = os.path.join(script_dir, "rps_tcn_model.pth") 
+script_dir = Path(__file__).resolve().parent
+repo_root = script_dir.parent
+TCN_MODEL_PATH = repo_root / "model" / "rps_tcn_model.pth"
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -141,37 +192,57 @@ def draw_result_ui(img, bot_move, outcome_text):
 
 # --- GEOMETRIC HEURISTICS ---
 def get_dist(landmarks, idx1, idx2):
-    p1 = landmarks.landmark[idx1]
-    p2 = landmarks.landmark[idx2]
+    """Calculate distance between two landmarks.
+    
+    Works with Tasks API where landmarks is a list of Landmark objects.
+    """
+    p1 = landmarks[idx1]
+    p2 = landmarks[idx2]
     return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2)
 
 def is_fist(landmarks):
-    wrist = 0
-    middle_closed = get_dist(landmarks, 12, wrist) < get_dist(landmarks, 9, wrist)
-    ring_closed   = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
-    pinky_closed  = get_dist(landmarks, 20, wrist) < get_dist(landmarks, 17, wrist)
-    return (middle_closed and ring_closed and pinky_closed)
+    """Check if hand is in fist/rock pose."""
+    try:
+        wrist = 0
+        middle_closed = get_dist(landmarks, 12, wrist) < get_dist(landmarks, 9, wrist)
+        ring_closed   = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
+        pinky_closed  = get_dist(landmarks, 20, wrist) < get_dist(landmarks, 17, wrist)
+        return (middle_closed and ring_closed and pinky_closed)
+    except Exception:
+        return False
 
 def is_paper(landmarks):
-    wrist = 0
-    index_open  = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
-    middle_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
-    ring_open   = get_dist(landmarks, 16, wrist) > get_dist(landmarks, 13, wrist)
-    pinky_open  = get_dist(landmarks, 20, wrist) > get_dist(landmarks, 17, wrist)
-    return (index_open and middle_open and ring_open and pinky_open)
+    """Check if hand is in paper/open pose."""
+    try:
+        wrist = 0
+        index_open  = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
+        middle_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
+        ring_open   = get_dist(landmarks, 16, wrist) > get_dist(landmarks, 13, wrist)
+        pinky_open  = get_dist(landmarks, 20, wrist) > get_dist(landmarks, 17, wrist)
+        return (index_open and middle_open and ring_open and pinky_open)
+    except Exception:
+        return False
 
 def get_current_gesture(landmarks):
-    if is_fist(landmarks): return 'Rock'
-    if is_paper(landmarks): return 'Paper'
-    wrist = 0
-    idx_open = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
-    mid_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
-    ring_closed = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
-    if idx_open and mid_open and ring_closed: return 'Scissors'
+    """Determine gesture type from hand landmarks."""
+    try:
+        if is_fist(landmarks): return 'Rock'
+        if is_paper(landmarks): return 'Paper'
+        wrist = 0
+        idx_open = get_dist(landmarks, 8, wrist) > get_dist(landmarks, 5, wrist)
+        mid_open = get_dist(landmarks, 12, wrist) > get_dist(landmarks, 9, wrist)
+        ring_closed = get_dist(landmarks, 16, wrist) < get_dist(landmarks, 13, wrist)
+        if idx_open and mid_open and ring_closed: return 'Scissors'
+    except Exception:
+        pass
     return None
 
 def run_game():
     print(f"Loading AI Brain...")
+    if not TCN_MODEL_PATH.exists():
+        print(f"Error loading model: file not found at '{TCN_MODEL_PATH}'")
+        return
+
     full_model = UnifiedModel().to(DEVICE)
     try:
         checkpoint = torch.load(TCN_MODEL_PATH, map_location=DEVICE)
@@ -191,14 +262,52 @@ def run_game():
     encoder = full_model.encoder.to(DEVICE)
     decoder = full_model.decoder.to(DEVICE)
     
-    print("Initializing MediaPipe...")
-    mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=1,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
+    print("Initializing MediaPipe (Tasks API)...")
+
+    # Prepare path for the MediaPipe hand landmarker task model
+    model_path = repo_root / "model" / "hand_landmarker.task"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Try multiple URLs for downloading the model
+    download_urls = [
+        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker.task",
+        "https://storage.googleapis.com/mediapipe-assets/hand_landmarker.task",
+    ]
+    
+    if not model_path.exists():
+        print(f"Downloading hand_landmarker model to {model_path}...")
+        downloaded = False
+        for url in download_urls:
+            try:
+                print(f"  Trying: {url}")
+                urllib.request.urlretrieve(url, str(model_path))
+                print("  ✓ Model downloaded successfully")
+                downloaded = True
+                break
+            except Exception as e:
+                print(f"  ✗ Failed: {e}")
+                continue
+        
+        if not downloaded:
+            print("ERROR: Could not download hand_landmarker model from any source.")
+            print("Please download manually from:")
+            print("  https://developers.google.com/mediapipe/solutions/vision/hand_landmarker")
+            print(f"And place it at: {model_path}")
+            return
+
+    # Create HandLandmarker using Tasks API
+    try:
+        print(f"Loading hand_landmarker from {model_path}...")
+        base_opts = base_options.BaseOptions(model_asset_path=str(model_path))
+        options = vision.HandLandmarkerOptions(base_options=base_opts)
+        hand_landmarker = vision.HandLandmarker.create_from_options(options)
+        print("✓ HandLandmarker initialized successfully")
+    except Exception as e:
+        print(f"ERROR initializing HandLandmarker: {e}")
+        print(f"Traceback: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return
     
     cap = cv2.VideoCapture(0)
     
@@ -227,7 +336,22 @@ def run_game():
         
         # --- 1. PROCESSING ---
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = hands.process(rgb_frame)
+        # Convert frame to MediaPipe Image and run detection with Tasks API
+        mp_img = mp_image.Image(image_format=mp_image.ImageFormat.SRGB, data=rgb_frame)
+        
+        try:
+            detection_result = hand_landmarker.detect(mp_img)
+        except Exception as e:
+            print(f"Detection error: {e}")
+            detection_result = None
+        
+        # Wrap detection_result to mimic old `results.multi_hand_landmarks` structure for compatibility
+        class ResultsWrapper:
+            def __init__(self, hand_landmarks):
+                # detection_result.hand_landmarks is already a list of NormalizedLandmarkList objects
+                self.multi_hand_landmarks = hand_landmarks if hand_landmarks else []
+
+        results = ResultsWrapper(detection_result.hand_landmarks if detection_result else None)
         
         current_features = None
         current_gesture_live = None 
@@ -237,8 +361,9 @@ def run_game():
             last_landmarks = hand_landmarks
             current_gesture_live = get_current_gesture(hand_landmarks)
             
-            x_list = [lm.x * w_img for lm in hand_landmarks.landmark]
-            y_list = [lm.y * h_img for lm in hand_landmarks.landmark]
+            # hand_landmarks is already a list of Landmark objects in Tasks API
+            x_list = [lm.x * w_img for lm in hand_landmarks]
+            y_list = [lm.y * h_img for lm in hand_landmarks]
             
             cx = (min(x_list) + max(x_list)) / 2
             cy = (min(y_list) + max(y_list)) / 2
@@ -343,7 +468,13 @@ def run_game():
 
         cv2.imshow("Magic RPS", frame)
         key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'): break
+        
+        # Handle quit commands (multiple ways to exit)
+        if key == ord('q') or key == ord('Q') or key == 27:  # 27 is ESC
+            print("\n👋 Closing game...")
+            break
+        
+        # Handle game start
         if key == ord(' ') and state == "IDLE":
             state = "COUNTDOWN"
             feature_buffer.clear()
@@ -351,6 +482,7 @@ def run_game():
 
     cap.release()
     cv2.destroyAllWindows()
+    print("✓ Game closed successfully")
 
 if __name__ == "__main__":
     run_game()
